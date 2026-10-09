@@ -1,0 +1,72 @@
+:host {
+  display: block;
+  margin-top: 2rem;
+}
+fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+button,
+select,
+input {
+  font: inherit;
+  max-width: 100%;
+}
+button,
+select {
+  padding: 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: white;
+}
+button {
+  cursor: pointer;
+  color: var(--accent);
+}
+button:disabled,
+fieldset:disabled {
+  opacity: 0.65;
+}
+label {
+  display: block;
+  margin: 0.5rem 0;
+  font-weight: 600;
+}
+.checkbox {
+  display: flex;
+  gap: 0.7rem;
+  align-items: start;
+}
+.documents {
+  list-style: none;
+  padding: 0;
+}
+.documents li {
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+.error,
+.conflict {
+  color: #8f2424;
+}
+.review {
+  border-top: 2px solid var(--border);
+  margin-top: 1rem;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  clip-path: inset(50%);
+  overflow: hidden;
+}

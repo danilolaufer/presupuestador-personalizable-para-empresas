@@ -1,0 +1,230 @@
+@let q = quote();
+@let totals = view().totals;
+<article
+  class="quote-paper"
+  [class.document-incomplete]="view().issues.length > 0"
+  [style.--document-accent]="q.brand.accentColor"
+  aria-label="Documento del presupuesto"
+>
+  <header class="document-header">
+    <div>
+      @if (q.brand.logoDataUrl) {
+        <img
+          class="document-logo"
+          [src]="q.brand.logoDataUrl"
+          alt="Logo del emisor conservado en el presupuesto"
+        />
+      }
+      @if (q.brand.name.trim()) {
+        <p class="brand-name">{{ q.brand.name }}</p>
+      }
+    </div>
+    <div>
+      <h1>PRESUPUESTO</h1>
+      <p class="document-number">{{ q.number || 'Número pendiente' }}</p>
+      <p class="document-status">{{ q.status === 'draft' ? 'BORRADOR' : labels[q.status] }}</p>
+    </div>
+  </header>
+  @if (q.title.trim()) {
+    <h2 class="reference">Referencia: {{ q.title }}</h2>
+  }
+  <p class="dates">Fecha: {{ date(q.issueDate) }} · Válido hasta: {{ date(q.validUntil) }}</p>
+  <div class="parties">
+    @for (
+      party of [
+        { title: 'Emisor', value: q.issuer },
+        { title: 'Cliente', value: q.client },
+      ];
+      track party.title
+    ) {
+      <section>
+        <h2>{{ party.title }}</h2>
+        <p>
+          <strong>{{ party.value.name || 'Nombre pendiente' }}</strong>
+        </p>
+        @if (party.value.taxId.trim()) {
+          <p>{{ party.value.taxId }}</p>
+        }
+        @if (party.value.address.trim()) {
+          <p class="user-text">{{ party.value.address }}</p>
+        }
+        @if (party.value.email.trim()) {
+          <p>{{ party.value.email }}</p>
+        }
+        @if (party.value.phone.trim()) {
+          <p>{{ party.value.phone }}</p>
+        }
+      </section>
+    }
+  </div>
+  <table class="services">
+    <caption>
+      Servicios e importes en EUR
+    </caption>
+    <colgroup>
+      <col class="service-column" />
+      <col />
+      <col />
+      <col />
+      <col />
+    </colgroup>
+    <thead>
+      <tr>
+        <th scope="col">Servicio</th>
+        <th scope="col">Cantidad</th>
+        <th scope="col">Precio sin IVA</th>
+        <th scope="col">Descuento</th>
+        <th scope="col">Total con IVA</th>
+      </tr>
+    </thead>
+    @for (line of q.lines; track line.id; let index = $index) {
+      <tbody class="service-group">
+        <tr class="service-amounts">
+          <th scope="row">
+            <strong>{{ line.name || 'Servicio pendiente' }}</strong
+            ><br />{{ line.frequency === 'monthly' ? 'Mensual' : 'Pago único' }}
+          </th>
+          <td>{{ line.quantity || '—' }}<br />{{ line.unit }}</td>
+          <td>{{ line.unitPrice ? money(line.unitPrice) : 'Pendiente' }}</td>
+          <td>
+            @if (line.discount.kind === 'none') {
+              —
+            } @else {
+              {{ line.discount.value || 'Pendiente' }}
+              {{ line.discount.kind === 'percentage' ? '%' : '€ / línea' }}
+            }
+          </td>
+          <td>
+            <strong>{{ totals ? money(totals.lines[index].total) : 'Pendiente' }}</strong>
+          </td>
+        </tr>
+        <tr class="line-tax">
+          <td colspan="5">
+            @if (totals) {
+              Base: {{ money(totals.lines[index].base) }} · Descuento aplicado:
+              {{ money(totals.lines[index].discount) }} · IVA:
+              {{ money(totals.lines[index].vat) }} ·
+            }
+            @if (line.vat.kind === 'taxed') {
+              Tipo de IVA: {{ line.vat.rate || 'Pendiente' }} %
+            } @else {
+              {{ line.vat.kind === 'exempt' ? 'Exento' : 'No sujeto' }}: {{ line.vat.note }}
+            }
+          </td>
+        </tr>
+        @if (line.description.trim()) {
+          <tr class="description-row">
+            <td colspan="5">
+              <p class="user-text">{{ line.description }}</p>
+            </td>
+          </tr>
+        }
+      </tbody>
+    }
+  </table>
+  @if (totals) {
+    <table class="taxes">
+      <caption>
+        Desglose fiscal
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">Periodicidad / IVA</th>
+          <th scope="col">Base</th>
+          <th scope="col">IVA</th>
+          <th scope="col">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (group of totals.taxGroups; track $index) {
+          <tr>
+            <th scope="row">
+              {{ group.frequency === 'monthly' ? 'Mensual' : 'Pago único' }} ·
+              @if (group.treatment.kind === 'taxed') {
+                {{ group.treatment.rate }} %
+              } @else {
+                {{ group.treatment.kind === 'exempt' ? 'Exento' : 'No sujeto' }}:
+                {{ group.treatment.note }}
+              }
+            </th>
+            <td>{{ money(group.base) }}</td>
+            <td>{{ money(group.vat) }}</td>
+            <td>{{ money(group.total) }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+    <section class="totals" aria-label="Resumen de importes">
+      <div class="frequency-totals">
+        @for (group of groups(); track group.title) {
+          <section>
+            <h2>{{ group.title }}</h2>
+            <dl>
+              <div>
+                <dt>Bruto</dt>
+                <dd>{{ money(group.amounts.gross) }}</dd>
+              </div>
+              <div>
+                <dt>Descuentos</dt>
+                <dd>{{ money(group.amounts.discount) }}</dd>
+              </div>
+              <div>
+                <dt>Base</dt>
+                <dd>{{ money(group.amounts.base) }}</dd>
+              </div>
+              <div>
+                <dt>IVA</dt>
+                <dd>{{ money(group.amounts.vat) }}</dd>
+              </div>
+              <div class="total">
+                <dt>Total</dt>
+                <dd>{{ money(group.amounts.total) }}</dd>
+              </div>
+            </dl>
+          </section>
+        }
+      </div>
+      <p class="combined">
+        {{ q.conditions.includesFirstMonthlyPayment ? 'Pago inicial' : 'Conjunto de conceptos' }}:
+        <strong>{{ money(totals.combined.total) }}</strong>
+      </p>
+      <p>
+        Base conjunta: {{ money(totals.combined.base) }} · IVA conjunto:
+        {{ money(totals.combined.vat) }}
+      </p>
+      <p class="small">
+        El conjunto suma el pago único y una mensualidad; no representa el coste total del contrato.
+      </p>
+    </section>
+  } @else {
+    <p class="incomplete">Cálculo incompleto. Completa los importes en el editor.</p>
+  }
+  <section class="payment">
+    <h2>Forma de pago</h2>
+    <p>{{ q.payment.method || 'Pendiente' }}</p>
+    @if (q.payment.holder.trim()) {
+      <p>Titular: {{ q.payment.holder }}</p>
+    }
+    @if (q.payment.iban.trim()) {
+      <p>IBAN: {{ q.payment.iban }}</p>
+    }
+    @if (q.payment.instructions.trim()) {
+      <p class="user-text">{{ q.payment.instructions }}</p>
+    }
+  </section>
+  @if (q.conditions.terms.trim()) {
+    <section>
+      <h2>Condiciones</h2>
+      <p class="user-text">{{ q.conditions.terms }}</p>
+    </section>
+  }
+  @if (q.conditions.notes.trim()) {
+    <section>
+      <h2>Observaciones</h2>
+      <p class="user-text">{{ q.conditions.notes }}</p>
+    </section>
+  }
+  <footer>
+    Presupuesto {{ q.number }} · {{ q.status === 'draft' ? 'BORRADOR' : labels[q.status] }} · EUR
+  </footer>
+</article>

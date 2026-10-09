@@ -1,0 +1,22 @@
+@use '../../shared/ui/management';
+.logo {
+  display: block;
+  max-width: 15rem;
+  max-height: 8rem;
+  object-fit: contain;
+  margin: 1rem 0;
+}
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+.checkbox input {
+  width: 1.25rem;
+}
+.status {
+  padding: 1rem;
+  border-left: 0.25rem solid var(--accent);
+  background: var(--accent-soft);
+}

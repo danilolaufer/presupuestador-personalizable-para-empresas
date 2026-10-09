@@ -1,0 +1,30 @@
+@use '../../../shared/ui/management';
+.table-scroll {
+  overflow-x: auto;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.9rem;
+}
+th,
+td {
+  padding: 0.9rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+thead th {
+  color: var(--muted);
+}
+tbody th {
+  min-width: 12rem;
+}
+small {
+  display: block;
+  font-weight: 400;
+}
+.amount {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}

@@ -1,0 +1,152 @@
+<div class="heading">
+  <div>
+    <p class="eyebrow">Gestión de documentos</p>
+    <h1>Presupuestos</h1>
+  </div>
+  <a class="button primary" routerLink="/presupuestos/nuevo">Crear presupuesto</a>
+</div>
+<p>
+  Pago único y cuota mensual se muestran por separado. Los documentos cerrados conservan los
+  importes de su envío.
+</p>
+<div class="fields panel">
+  <div>
+    <label for="quote-search">Buscar por número, cliente o título</label
+    ><input
+      id="quote-search"
+      type="search"
+      [value]="search()"
+      (input)="search.set(inputValue($event))"
+    />
+  </div>
+  <div>
+    <label for="quote-status">Estado</label
+    ><select id="quote-status" [value]="status()" (change)="status.set(inputValue($event))">
+      <option value="all">Todos los estados</option>
+      @for (item of statuses; track item) {
+        <option [value]="item">{{ labels[item] }}</option>
+      }
+    </select>
+  </div>
+  <div>
+    <label for="quote-order">Última modificación</label
+    ><select id="quote-order" [value]="order()" (change)="order.set(inputValue($event))">
+      <option value="desc">Más recientes primero</option>
+      <option value="asc">Más antiguos primero</option>
+    </select>
+  </div>
+  <div class="actions">
+    <button type="button" (click)="load()" [disabled]="state() === 'loading' || busy()">
+      Actualizar listado
+    </button>
+  </div>
+</div>
+@if (state() === 'loading') {
+  <p role="status">Cargando presupuestos…</p>
+}
+@if (state() === 'error') {
+  <p role="alert" class="error">{{ error() }}</p>
+  <button type="button" (click)="load()">Reintentar carga</button>
+}
+@if (actionError() && !deleteTarget()) {
+  <p role="alert" class="error">{{ actionError() }}</p>
+}
+@if (busy()) {
+  <p role="status">Procesando documento…</p>
+}
+@if (state() === 'ready') {
+  @if (!quotes().length) {
+    <section class="panel">
+      <h2>Todavía no hay presupuestos</h2>
+      <p>Crea el primero para comenzar. Se guardará en este navegador.</p>
+    </section>
+  } @else if (!visibleRows().length) {
+    <p role="status">No hay presupuestos que coincidan con la búsqueda y el estado elegidos.</p>
+  } @else {
+    <p role="status">{{ visibleRows().length }} presupuestos</p>
+    <div class="table-scroll panel" role="region" aria-label="Listado de presupuestos" tabindex="0">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Número y título</th>
+            <th scope="col">Cliente</th>
+            <th scope="col">Fecha</th>
+            <th scope="col">Estado</th>
+            <th scope="col">Pago único</th>
+            <th scope="col">Cuota mensual</th>
+            <th scope="col">Modificado</th>
+            <th scope="col">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of visibleRows(); track row.quote.id) {
+            <tr [attr.data-quote-id]="row.quote.id">
+              <th scope="row">
+                <a [routerLink]="['/presupuestos', row.quote.id, 'editar']">{{
+                  row.quote.number || 'Sin número'
+                }}</a
+                ><small>{{ row.quote.title || 'Sin título' }}</small>
+              </th>
+              <td>{{ row.quote.client.name || 'Cliente pendiente' }}</td>
+              <td>{{ row.quote.issueDate || 'Pendiente' }}</td>
+              <td>{{ labels[row.quote.status] }}</td>
+              @if (row.totals; as totals) {
+                <td class="amount">{{ formatMoney(totals.oneTime.total) }}</td>
+                <td class="amount">{{ formatMoney(totals.monthly.total) }}</td>
+              } @else {
+                <td colspan="2">Cálculo incompleto: revisa los importes</td>
+              }
+              <td>{{ row.quote.updatedAt | date: 'dd/MM/yyyy HH:mm' }}</td>
+              <td>
+                <div class="actions">
+                  <a
+                    [routerLink]="['/presupuestos', row.quote.id, 'editar']"
+                    [attr.aria-label]="'Abrir ' + row.quote.number"
+                    >Abrir</a
+                  ><button
+                    type="button"
+                    (click)="duplicate(row.quote)"
+                    [disabled]="busy()"
+                    [attr.aria-label]="'Duplicar ' + row.quote.number"
+                  >
+                    Duplicar</button
+                  ><button
+                    type="button"
+                    class="danger"
+                    (click)="askDelete(row.quote)"
+                    [disabled]="busy()"
+                    [attr.aria-label]="'Eliminar ' + row.quote.number"
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+}
+<dialog
+  #deleteDialog
+  aria-labelledby="delete-title"
+  aria-describedby="delete-description"
+  (cancel)="busy() ? $event.preventDefault() : cancelDelete()"
+>
+  <h2 id="delete-title">¿Eliminar este presupuesto?</h2>
+  <p id="delete-description">
+    {{ deleteTarget()?.number || 'Sin número' }} · {{ deleteTarget()?.title || 'Sin título' }} ·
+    {{ deleteTarget()?.client?.name || 'Cliente pendiente' }}. Se eliminará de este navegador y no
+    se puede deshacer.
+  </p>
+  @if (actionError()) {
+    <p role="alert" class="error">{{ actionError() }}</p>
+  }
+  <div class="actions">
+    <button type="button" autofocus (click)="cancelDelete()" [disabled]="busy()">Cancelar</button
+    ><button type="button" class="danger" (click)="confirmDelete()" [disabled]="busy()">
+      Eliminar presupuesto
+    </button>
+  </div>
+</dialog>

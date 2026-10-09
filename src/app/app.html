@@ -1,0 +1,23 @@
+<a class="skip-link" href="#main-content">Saltar al contenido</a>
+<header class="app-header">
+  <a class="brand" routerLink="/presupuestos">Presupuestador</a>
+  <nav aria-label="Navegación principal">
+    <a
+      routerLink="/presupuestos"
+      routerLinkActive="active"
+      [routerLinkActiveOptions]="{ exact: true }"
+      ariaCurrentWhenActive="page"
+    >
+      Presupuestos
+    </a>
+    <a routerLink="/presupuestos/nuevo" routerLinkActive="active" ariaCurrentWhenActive="page"
+      >Nuevo presupuesto</a
+    >
+    <a routerLink="/configuracion" routerLinkActive="active" ariaCurrentWhenActive="page">
+      Configuración
+    </a>
+  </nav>
+</header>
+<main id="main-content" tabindex="-1">
+  <router-outlet />
+</main>

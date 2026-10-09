@@ -1,0 +1,29 @@
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+button {
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.4rem;
+  background: white;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+[role='alert'] {
+  padding: 1rem;
+  border: 1px solid #a33;
+  border-radius: 0.4rem;
+}
+.preview-controls {
+  max-width: 55rem;
+  margin: auto;
+}

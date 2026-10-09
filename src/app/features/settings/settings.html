@@ -1,0 +1,272 @@
+<p class="eyebrow">Valores para nuevos presupuestos</p>
+<h1>Configuración y catálogo</h1>
+<p>
+  Los cambios se aplican a documentos nuevos. Cada presupuesto conserva su propia copia de empresa,
+  marca, pago, condiciones y servicios.
+</p>
+<div class="status" role="status" aria-atomic="true">
+  @switch (state()) {
+    @case ('loading') {
+      Cargando configuración…
+    }
+    @case ('unsaved') {
+      Sin guardar
+    }
+    @case ('saving') {
+      Guardando configuración…
+    }
+    @case ('saved') {
+      Configuración guardada a las
+      <time [attr.datetime]="savedAt()">{{ savedAt() | date: 'HH:mm:ss' }}</time>
+    }
+    @case ('error') {
+      Error de configuración
+    }
+    @case ('conflict') {
+      Conflicto de configuración
+    }
+  }
+</div>
+@if (error()) {
+  <p role="alert" class="error">{{ error() }}</p>
+}
+@if (!loaded() && state() === 'error') {
+  <button type="button" (click)="load()">Reintentar carga</button>
+}
+@if (loaded()) {
+  <div class="actions">
+    <button
+      type="button"
+      class="primary"
+      (click)="save()"
+      [disabled]="
+        state() === 'saving' || state() === 'loading' || state() === 'conflict' || logoBusy()
+      "
+    >
+      Guardar configuración
+    </button>
+    @if (state() === 'conflict' || state() === 'error') {
+      <button type="button" (click)="load(true)">Cargar configuración guardada…</button>
+    }
+  </div>
+  @if (issues().length) {
+    <div role="alert" class="error">
+      <p>Revisa estos campos:</p>
+      <ul>
+        @for (issue of issues(); track $index) {
+          <li>{{ issue }}</li>
+        }
+      </ul>
+    </div>
+  }
+  <form [formGroup]="form" (ngSubmit)="save()" novalidate [attr.inert]="backupBusy() ? '' : null">
+    <fieldset class="panel">
+      <legend>Empresa y marca</legend>
+      <div class="fields">
+        <app-quote-field
+          [control]="form.controls.brand.controls.name"
+          fieldId="settings-commercial-name"
+          label="Nombre comercial"
+        />
+        @for (field of issuerFields; track field[0]) {
+          <app-quote-field
+            [control]="form.controls.issuer.controls[field[0]]"
+            [fieldId]="'settings-issuer-' + field[0]"
+            [label]="field[1]"
+            [type]="field[0] === 'email' ? 'email' : 'text'"
+          />
+        }
+        <app-quote-field
+          [control]="form.controls.brand.controls.accentColor"
+          fieldId="settings-color"
+          label="Color principal"
+          type="color"
+        />
+        <div>
+          <label for="settings-logo">Logo (PNG, JPEG o WebP; máximo 300 KiB)</label>
+          <input
+            id="settings-logo"
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            (change)="chooseLogo($event)"
+            [disabled]="logoBusy() || state() === 'saving' || state() === 'loading'"
+          />
+          @if (logoBusy()) {
+            <p role="status">Comprobando imagen…</p>
+          }
+          @if (logoError()) {
+            <p role="alert" class="error">{{ logoError() }}</p>
+          }
+          @if (form.controls.brand.controls.logoDataUrl.value; as logo) {
+            <img class="logo" [src]="logo" alt="Logo de la empresa" />
+            <button
+              type="button"
+              (click)="form.controls.brand.controls.logoDataUrl.setValue(null)"
+              [disabled]="logoBusy() || state() === 'saving' || state() === 'loading'"
+            >
+              Quitar logo
+            </button>
+          }
+        </div>
+      </div>
+    </fieldset>
+    <fieldset class="panel">
+      <legend>Pago y condiciones predeterminadas</legend>
+      <div class="fields">
+        @for (field of paymentFields; track field[0]) {
+          <app-quote-field
+            [control]="form.controls.payment.controls[field[0]]"
+            [fieldId]="'settings-payment-' + field[0]"
+            [label]="field[1]"
+            [multiline]="field[0] === 'instructions'"
+          />
+        }
+        <app-quote-field
+          [control]="form.controls.conditions.controls.terms"
+          fieldId="settings-terms"
+          label="Condiciones"
+          [multiline]="true"
+        />
+        <app-quote-field
+          [control]="form.controls.conditions.controls.notes"
+          fieldId="settings-notes"
+          label="Observaciones predeterminadas"
+          [multiline]="true"
+        />
+        <app-quote-field
+          [control]="form.controls.suggestedVatRate"
+          fieldId="settings-vat"
+          label="IVA sugerido (%)"
+          inputMode="decimal"
+        />
+        <app-quote-field
+          [control]="form.controls.validityDays"
+          fieldId="settings-validity"
+          label="Plazo de validez (días)"
+          inputMode="numeric"
+          hint="De 0 a 3650 días desde la emisión."
+        />
+      </div>
+      <label class="checkbox" for="settings-first-month"
+        ><input
+          id="settings-first-month"
+          type="checkbox"
+          [formControl]="form.controls.conditions.controls.includesFirstMonthlyPayment"
+        />El pago inicial incluye una mensualidad</label
+      >
+    </fieldset>
+    <section aria-labelledby="catalog-title">
+      <h2 id="catalog-title">Catálogo de servicios</h2>
+      <p>
+        Al añadir una plantilla al presupuesto, se copian sus valores. Editarla o eliminarla aquí
+        conserva las líneas anteriores.
+      </p>
+      @if (!form.controls.catalog.length) {
+        <p>No hay plantillas. Puedes seguir creando líneas manuales en el editor.</p>
+      }
+      @for (
+        item of form.controls.catalog.controls;
+        track item.controls.id.value;
+        let index = $index
+      ) {
+        <fieldset class="panel" [attr.data-template-id]="item.controls.id.value">
+          <legend>Plantilla {{ index + 1 }}</legend>
+          <div class="fields">
+            <app-quote-field
+              [control]="item.controls.name"
+              [fieldId]="'template-' + index + '-name'"
+              label="Nombre"
+              [required]="true"
+            />
+            <app-quote-field
+              [control]="item.controls.unit"
+              [fieldId]="'template-' + index + '-unit'"
+              label="Unidad"
+              [required]="true"
+            />
+            <app-quote-field
+              class="full-width"
+              [control]="item.controls.description"
+              [fieldId]="'template-' + index + '-description'"
+              label="Descripción"
+              [multiline]="true"
+            />
+            <app-quote-field
+              [control]="item.controls.unitPrice"
+              [fieldId]="'template-' + index + '-price'"
+              label="Precio sin IVA (€)"
+              inputMode="decimal"
+              [required]="true"
+            />
+            <div>
+              <label [for]="'template-' + index + '-frequency'">Periodicidad</label
+              ><select
+                [id]="'template-' + index + '-frequency'"
+                [formControl]="item.controls.frequency"
+              >
+                <option value="monthly">Mensual</option>
+                <option value="one-time">Pago único</option>
+              </select>
+            </div>
+            <div>
+              <label [for]="'template-' + index + '-vat-kind'">Tratamiento de IVA</label
+              ><select
+                [id]="'template-' + index + '-vat-kind'"
+                [formControl]="item.controls.vat.controls.kind"
+              >
+                <option value="taxed">Sujeto a IVA</option>
+                <option value="exempt">Exento</option>
+                <option value="not-subject">No sujeto</option>
+              </select>
+            </div>
+            @if (item.controls.vat.controls.kind.value === 'taxed') {
+              <app-quote-field
+                [control]="item.controls.vat.controls.rate"
+                [fieldId]="'template-' + index + '-vat-rate'"
+                label="IVA (%)"
+                inputMode="decimal"
+                [required]="true"
+              />
+            } @else {
+              <app-quote-field
+                [control]="item.controls.vat.controls.note"
+                [fieldId]="'template-' + index + '-vat-note'"
+                label="Motivo fiscal"
+                [required]="true"
+              />
+            }
+          </div>
+          <button
+            type="button"
+            class="danger"
+            (click)="removeTemplate(index)"
+            [disabled]="state() === 'saving' || state() === 'loading'"
+          >
+            Eliminar plantilla {{ index + 1 }}
+          </button>
+        </fieldset>
+      }
+      <button
+        type="button"
+        (click)="addTemplate()"
+        [disabled]="
+          state() === 'saving' || state() === 'loading' || form.controls.catalog.length >= 1000
+        "
+      >
+        Añadir plantilla
+      </button>
+    </section>
+    <div class="actions">
+      <button
+        type="submit"
+        class="primary"
+        [disabled]="
+          state() === 'saving' || state() === 'loading' || state() === 'conflict' || logoBusy()
+        "
+      >
+        Guardar configuración
+      </button>
+    </div>
+  </form>
+  <app-backup-controls [runOperation]="runBackup" (restored)="load()" />
+}

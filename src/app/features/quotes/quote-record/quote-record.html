@@ -1,0 +1,123 @@
+@let document = quote();
+<p class="eyebrow">{{ labels[document.status] }} · Contenido conservado</p>
+<h1>{{ document.number }}{{ document.title ? ' · ' + document.title : '' }}</h1>
+<p>
+  Este documento conserva su contenido e importes. Para modificarlos, crea una revisión
+  independiente.
+</p>
+<div class="actions">
+  <a [routerLink]="['/presupuestos', document.id, 'vista-previa']">Vista previa / Imprimir</a>
+  <button type="button" class="primary" (click)="createRevision.emit()" [disabled]="busy()">
+    Crear revisión
+  </button>
+  @for (status of states; track status) {
+    @if (status !== document.status) {
+      <button type="button" (click)="changeState.emit(status)" [disabled]="busy()">
+        Marcar como {{ labels[status].toLowerCase() }}
+      </button>
+    }
+  }
+  <a routerLink="/presupuestos">Volver al listado</a>
+</div>
+<p class="muted">Los cambios de estado son manuales y no envían ningún correo.</p>
+@if (busy()) {
+  <p role="status">Guardando cambios…</p>
+}
+@if (error()) {
+  <p role="alert" class="error">{{ error() }}</p>
+  <button type="button" (click)="reload.emit()" [disabled]="busy()">Recargar documento</button>
+}
+@if (document.revisionOfId) {
+  <p>
+    <a [routerLink]="['/presupuestos', document.revisionOfId, 'editar']"
+      >Ver presupuesto de origen</a
+    >
+  </p>
+}
+<p>
+  Emisión: {{ document.issueDate }} · Válido hasta: {{ document.validUntil }} · Modificado:
+  {{ document.updatedAt | date: 'dd/MM/yyyy HH:mm' }}
+</p>
+<div class="fields">
+  <section class="panel">
+    <h2>Emisor</h2>
+    <p>{{ document.issuer.name }}</p>
+    <p>{{ document.issuer.taxId }}</p>
+    <p>{{ document.issuer.address }}</p>
+    <p>{{ document.issuer.email }} {{ document.issuer.phone }}</p>
+    <p>Nombre comercial: {{ document.brand.name }}</p>
+    @if (document.brand.logoDataUrl) {
+      <img
+        class="logo"
+        [src]="document.brand.logoDataUrl"
+        alt="Logo conservado en el presupuesto"
+      />
+    }
+  </section>
+  <section class="panel">
+    <h2>Cliente</h2>
+    <p>{{ document.client.name }}</p>
+    <p>{{ document.client.taxId }}</p>
+    <p>{{ document.client.address }}</p>
+    <p>{{ document.client.email }} {{ document.client.phone }}</p>
+  </section>
+</div>
+<section class="panel">
+  <h2>Servicios</h2>
+  @for (line of document.lines; track line.id; let index = $index) {
+    <article>
+      <h3>{{ line.name }}</h3>
+      <p class="text">{{ line.description }}</p>
+      <p>
+        {{ line.quantity }} {{ line.unit }} · {{ formatMoney(line.unitPrice) }} sin IVA ·
+        {{ line.frequency === 'monthly' ? 'Mensual' : 'Pago único' }}
+      </p>
+      <p>
+        Descuento:
+        @if (line.discount.kind === 'none') {
+          Sin descuento
+        } @else {
+          {{ line.discount.value }} {{ line.discount.kind === 'percentage' ? '%' : '€ por línea' }}
+        }
+      </p>
+      <p>
+        IVA:
+        @if (line.vat.kind === 'taxed') {
+          {{ line.vat.rate }} %
+        } @else {
+          {{ line.vat.kind === 'exempt' ? 'Exento' : 'No sujeto' }} · {{ line.vat.note }}
+        }
+      </p>
+    </article>
+  }
+</section>
+<section class="panel">
+  <h2>Importes conservados</h2>
+  <p>
+    Pago único: <strong>{{ formatMoney(document.totals.oneTime.total) }}</strong>
+  </p>
+  <p>
+    Cuota mensual: <strong>{{ formatMoney(document.totals.monthly.total) }}</strong>
+  </p>
+  <p>
+    Base: {{ formatMoney(document.totals.combined.base) }} · Descuentos:
+    {{ formatMoney(document.totals.combined.discount) }} · IVA:
+    {{ formatMoney(document.totals.combined.vat) }}
+  </p>
+  <p>
+    {{
+      document.conditions.includesFirstMonthlyPayment ? 'Pago inicial' : 'Conjunto de conceptos'
+    }}: <strong>{{ formatMoney(document.totals.combined.total) }}</strong>
+  </p>
+</section>
+<section class="panel">
+  <h2>Pago y condiciones</h2>
+  <p>{{ document.payment.method }}</p>
+  <p>Titular: {{ document.payment.holder }}</p>
+  <p>{{ document.payment.iban }}</p>
+  <p class="text">{{ document.payment.instructions }}</p>
+  <h3>Condiciones</h3>
+  <p class="text">{{ document.conditions.terms }}</p>
+  <h3>Observaciones</h3>
+  <p class="text">{{ document.conditions.notes }}</p>
+</section>

@@ -1,0 +1,52 @@
+<div class="preview-controls no-print">
+  <h1>Vista previa</h1>
+  <p>
+    Para obtener un PDF, elige «Guardar como PDF» en el diálogo de impresión. Imprimir no cambia el
+    estado del presupuesto.
+  </p>
+  @if (quote(); as q) {
+    <div class="actions">
+      <button type="button" (click)="print()" [disabled]="printing() || issues().length > 0">
+        {{ printing() ? 'Preparando impresión…' : 'Imprimir / Guardar como PDF' }}
+      </button>
+      <a [routerLink]="['/presupuestos', q.id, 'editar']">Volver al presupuesto</a>
+      <button type="button" (click)="load()" [disabled]="printing()">
+        Actualizar vista previa
+      </button>
+    </div>
+    @if (issues().length) {
+      <div role="alert">
+        <h2>Antes de imprimir, corrige:</h2>
+        <ul>
+          @for (issue of issues(); track $index) {
+            <li>{{ issue }}</li>
+          }
+        </ul>
+      </div>
+    }
+    <p>
+      Se muestra la versión guardada al abrir esta vista. Si editas en otra pestaña, actualízala
+      antes de imprimir.
+    </p>
+  }
+  @if (state() === 'loading') {
+    <p role="status">Cargando documento…</p>
+  }
+  @if (state() === 'missing') {
+    <p role="alert">Este presupuesto no existe.</p>
+  }
+  @if (error()) {
+    <p role="alert">{{ error() }}</p>
+  }
+  @if (state() === 'error') {
+    <button type="button" (click)="load()">Reintentar lectura</button>
+  }
+</div>
+@if (quote(); as q) {
+  <app-quote-document #paper [quote]="q" [class.print-blocked]="issues().length > 0" />
+}
+@if (issues().length || state() !== 'ready') {
+  <p class="print-only">
+    Documento no disponible para imprimir. Revisa los datos en la aplicación.
+  </p>
+}

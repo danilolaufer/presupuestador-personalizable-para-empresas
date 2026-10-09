@@ -1,0 +1,589 @@
+@if (store.loadState() !== 'ready') {
+  @if (store.loadState() !== 'read-only') {
+    <h1>Presupuesto</h1>
+  }
+  @switch (store.loadState()) {
+    @case ('loading') {
+      <p role="status">Cargando…</p>
+    }
+    @case ('not-found') {
+      <p role="alert">
+        No existe un presupuesto con esta dirección. No se ha creado ni reemplazado ningún
+        documento.
+      </p>
+    }
+    @case ('read-only') {
+      @if (store.closedQuote(); as document) {
+        <app-quote-record
+          [quote]="document"
+          [busy]="store.commercialBusy()"
+          [error]="store.commercialError()"
+          (changeState)="store.changeCommercialStatus($event)"
+          (createRevision)="createRevision()"
+          (reload)="retryLoad()"
+        />
+      }
+    }
+    @case ('load-error') {
+      <p role="alert">{{ store.loadError() }}</p>
+      <button type="button" (click)="retryLoad()">Reintentar carga</button>
+    }
+  }
+  <p>
+    <a routerLink="/presupuestos/nuevo">Crear un presupuesto nuevo</a> ·
+    <a routerLink="/presupuestos">Volver a presupuestos</a>
+  </p>
+} @else {
+  @let result = store.calculation();
+  <div class="editor-heading">
+    <div>
+      <p class="eyebrow">Presupuesto en borrador</p>
+      <h1>Editor de presupuesto</h1>
+    </div>
+    <div class="actions">
+      <a href="#quote-summary">Ir al resumen</a>
+      <button
+        type="button"
+        (click)="openPreview()"
+        [disabled]="!store.canEdit() || store.commercialBusy()"
+      >
+        Vista previa
+      </button>
+      <button type="button" (click)="requestExample()" [disabled]="!store.canEdit()">
+        Cargar ejemplo
+      </button>
+    </div>
+  </div>
+  <div class="save-status" aria-label="Estado del guardado">
+    <p role="status" aria-atomic="true">
+      @switch (store.saveState()) {
+        @case ('unsaved') {
+          Sin guardar
+        }
+        @case ('saving') {
+          Guardando…
+        }
+        @case ('saved') {
+          Guardado a las
+          <time [attr.datetime]="store.savedAt()">{{ formatSavedAt(store.savedAt()) }}</time>
+        }
+        @case ('error') {
+          Error al guardar
+        }
+        @case ('conflict') {
+          Conflicto de versiones: se conservan tus cambios locales.
+        }
+      }
+    </p>
+    @if (store.saveState() === 'error' || store.saveState() === 'conflict') {
+      <p role="alert">{{ store.saveError() }}</p>
+      <div class="actions">
+        <button type="button" (click)="downloadEmergency()">Descargar borrador (JSON)</button>
+        @if (store.saveState() === 'error') {
+          <button type="button" (click)="retrySave()">Reintentar guardado</button>
+        } @else {
+          <button type="button" (click)="requestStoredVersion()" [disabled]="store.reloading()">
+            Cargar versión almacenada…
+          </button>
+        }
+      </div>
+      @if (store.loadError()) {
+        <p role="alert">{{ store.loadError() }}</p>
+      }
+    }
+    @if (store.reloading()) {
+      <p role="status">Cargando la versión almacenada…</p>
+    }
+  </div>
+  <p class="notice">
+    Se guarda en este navegador. Conserva la dirección de edición para volver a este presupuesto.
+  </p>
+  <div class="actions">
+    <button
+      type="button"
+      class="primary"
+      (click)="markSent()"
+      [disabled]="!store.canEdit() || store.commercialBusy()"
+    >
+      Marcar como enviado
+    </button>
+    <a routerLink="/presupuestos">Volver al listado</a>
+  </div>
+  <p class="muted">
+    «Marcar como enviado» registra un estado manual y no envía ningún correo. El contenido quedará
+    cerrado; podrás crear una revisión para cambiarlo.
+  </p>
+  @if (store.commercialError()) {
+    <p role="alert">{{ store.commercialError() }}</p>
+  }
+  @if (store.quote().revisionOfId) {
+    <p>
+      <a [routerLink]="['/presupuestos', store.quote().revisionOfId, 'editar']"
+        >Ver presupuesto de origen de esta revisión</a
+      >
+    </p>
+  }
+  <p class="muted">
+    Los campos con * son necesarios para completar el documento. Puedes calcular importes mientras
+    completas los demás datos.
+  </p>
+  <p class="action-message" role="status" aria-atomic="true">{{ actionMessage() }}</p>
+
+  <div class="editor-layout" [attr.inert]="store.reloading() ? '' : null">
+    <form [formGroup]="form" (ngSubmit)="reviewFields()" novalidate>
+      <fieldset class="panel">
+        <legend>Datos del presupuesto</legend>
+        <div class="fields three-columns">
+          <app-quote-field
+            class="full-width"
+            [control]="form.controls.title"
+            fieldId="quote-title"
+            label="Título del presupuesto"
+          />
+          <app-quote-field
+            [control]="form.controls.number"
+            fieldId="quote-number"
+            label="Número del presupuesto"
+            [required]="true"
+            [error]="fieldError('number')"
+          />
+          <app-quote-field
+            [control]="form.controls.issueDate"
+            fieldId="quote-issueDate"
+            label="Fecha de emisión"
+            type="date"
+            [required]="true"
+            [error]="fieldError('issueDate')"
+          />
+          <app-quote-field
+            [control]="form.controls.validUntil"
+            fieldId="quote-validUntil"
+            label="Válido hasta"
+            type="date"
+            [required]="true"
+            [error]="fieldError('validUntil')"
+          />
+        </div>
+      </fieldset>
+
+      @for (party of parties; track party.key) {
+        <fieldset class="panel">
+          <legend>{{ party.title }}</legend>
+          <div class="fields">
+            <app-quote-field
+              [control]="party.group.controls.name"
+              [fieldId]="fieldId(party.key + '.name')"
+              label="Nombre o razón social"
+              [required]="true"
+              [error]="fieldError(party.key + '.name')"
+            />
+            <app-quote-field
+              [control]="party.group.controls.taxId"
+              [fieldId]="fieldId(party.key + '.taxId')"
+              label="NIF / identificación fiscal"
+              [required]="true"
+              [error]="fieldError(party.key + '.taxId')"
+            />
+            <app-quote-field
+              class="full-width"
+              [control]="party.group.controls.address"
+              [fieldId]="fieldId(party.key + '.address')"
+              label="Dirección"
+              [required]="true"
+              [error]="fieldError(party.key + '.address')"
+            />
+            <app-quote-field
+              [control]="party.group.controls.email"
+              [fieldId]="fieldId(party.key + '.email')"
+              label="Correo electrónico"
+              type="email"
+              [error]="fieldError(party.key + '.email')"
+            />
+            <app-quote-field
+              [control]="party.group.controls.phone"
+              [fieldId]="fieldId(party.key + '.phone')"
+              label="Teléfono"
+              type="tel"
+            />
+          </div>
+        </fieldset>
+      }
+
+      <section aria-labelledby="services-title" id="quote-lines" tabindex="-1">
+        <h2 id="services-title">Servicios</h2>
+        <details class="panel">
+          <summary>Añadir desde el catálogo</summary>
+          <div class="select-field">
+            <label for="catalog-search">Buscar servicio en el catálogo</label
+            ><input
+              id="catalog-search"
+              type="search"
+              [value]="catalogSearch()"
+              (input)="searchCatalog($event)"
+            />
+          </div>
+          <button type="button" (click)="store.loadCatalog()" [disabled]="store.catalogLoading()">
+            Actualizar catálogo
+          </button>
+          @if (store.catalogLoading()) {
+            <p role="status">Cargando catálogo…</p>
+          }
+          @if (store.catalogError()) {
+            <p role="alert">{{ store.catalogError() }}</p>
+          }
+          @for (template of filteredCatalog(); track template.id) {
+            <p>
+              {{ template.name }} · {{ template.unitPrice }} € sin IVA / {{ template.unit }} ·
+              {{ template.frequency === 'monthly' ? 'Mensual' : 'Pago único' }}
+              <button
+                type="button"
+                (click)="addTemplate(template.id)"
+                [disabled]="!store.canEdit() || form.controls.lines.length >= store.maxLines"
+              >
+                Añadir {{ template.name }}
+              </button>
+            </p>
+          } @empty {
+            <p>
+              No hay plantillas que mostrar. Puedes añadir servicios manuales o
+              <a routerLink="/configuracion">editar el catálogo</a>.
+            </p>
+          }
+        </details>
+        <p class="muted">
+          Precios sin IVA. Admite coma o punto decimal, sin separadores de miles. El descuento fijo
+          se aplica una vez a toda la línea.
+        </p>
+        @for (
+          line of form.controls.lines.controls;
+          track line.controls.id.value;
+          let index = $index
+        ) {
+          <fieldset class="panel service" [attr.data-line-id]="line.controls.id.value">
+            <legend>Servicio {{ index + 1 }}</legend>
+            <div class="line-actions">
+              <button
+                type="button"
+                (click)="moveLine(index, -1)"
+                [disabled]="index === 0"
+                [attr.aria-label]="'Subir servicio ' + (index + 1)"
+              >
+                Subir
+              </button>
+              <button
+                type="button"
+                (click)="moveLine(index, 1)"
+                [disabled]="index === form.controls.lines.length - 1"
+                [attr.aria-label]="'Bajar servicio ' + (index + 1)"
+              >
+                Bajar
+              </button>
+              <button
+                type="button"
+                (click)="duplicateLine(index)"
+                [disabled]="form.controls.lines.length >= store.maxLines"
+                [attr.aria-label]="'Duplicar servicio ' + (index + 1)"
+              >
+                Duplicar
+              </button>
+              <button
+                type="button"
+                class="danger"
+                (click)="removeLine(index)"
+                [attr.aria-label]="'Eliminar servicio ' + (index + 1)"
+              >
+                Eliminar
+              </button>
+            </div>
+            <div class="fields">
+              <app-quote-field
+                class="full-width"
+                [control]="line.controls.name"
+                [fieldId]="fieldId('name', line)"
+                label="Nombre del servicio"
+                [required]="true"
+                [error]="fieldError('name', line)"
+              />
+              <app-quote-field
+                class="full-width"
+                [control]="line.controls.description"
+                [fieldId]="fieldId('description', line)"
+                label="Descripción"
+                [multiline]="true"
+              />
+              <app-quote-field
+                [control]="line.controls.unit"
+                [fieldId]="fieldId('unit', line)"
+                label="Unidad"
+                hint="Por ejemplo: sitio, hora o servicio."
+                [required]="true"
+                [error]="fieldError('unit', line)"
+              />
+              <app-quote-field
+                [control]="line.controls.quantity"
+                [fieldId]="fieldId('quantity', line)"
+                label="Cantidad"
+                inputMode="decimal"
+                hint="Mayor que cero; hasta 3 decimales."
+                [required]="true"
+                [error]="fieldError('quantity', line)"
+              />
+              <app-quote-field
+                [control]="line.controls.unitPrice"
+                [fieldId]="fieldId('unitPrice', line)"
+                label="Precio sin IVA (€)"
+                inputMode="decimal"
+                hint="Hasta 2 decimales."
+                [required]="true"
+                [error]="fieldError('unitPrice', line)"
+              />
+              <div class="select-field">
+                <label [for]="fieldId('frequency', line)">Periodicidad *</label>
+                <select
+                  [id]="fieldId('frequency', line)"
+                  [formControl]="line.controls.frequency"
+                  aria-required="true"
+                >
+                  <option value="one-time">Pago único</option>
+                  <option value="monthly">Mensual</option>
+                </select>
+              </div>
+              <div class="select-field">
+                <label [for]="fieldId('discount.kind', line)">Tipo de descuento</label>
+                <select
+                  [id]="fieldId('discount.kind', line)"
+                  [formControl]="line.controls.discount.controls.kind"
+                >
+                  <option value="none">Sin descuento</option>
+                  <option value="percentage">Porcentaje</option>
+                  <option value="fixed">Importe fijo por línea</option>
+                </select>
+              </div>
+              @if (line.controls.discount.controls.kind.value !== 'none') {
+                <app-quote-field
+                  [control]="line.controls.discount.controls.value"
+                  [fieldId]="fieldId('discount.value', line)"
+                  [label]="
+                    line.controls.discount.controls.kind.value === 'percentage'
+                      ? 'Descuento (%)'
+                      : 'Descuento de la línea (€)'
+                  "
+                  inputMode="decimal"
+                  [required]="true"
+                  [error]="fieldError('discount.value', line)"
+                />
+              }
+              <div class="select-field">
+                <label [for]="fieldId('vat.kind', line)">Tratamiento de IVA *</label>
+                <select
+                  [id]="fieldId('vat.kind', line)"
+                  [formControl]="line.controls.vat.controls.kind"
+                  aria-required="true"
+                >
+                  <option value="taxed">Sujeto a IVA</option>
+                  <option value="exempt">Exento</option>
+                  <option value="not-subject">No sujeto</option>
+                </select>
+              </div>
+              @if (line.controls.vat.controls.kind.value === 'taxed') {
+                <app-quote-field
+                  [control]="line.controls.vat.controls.rate"
+                  [fieldId]="fieldId('vat.rate', line)"
+                  label="IVA (%)"
+                  inputMode="decimal"
+                  hint="Elige el tipo aplicable, incluido 0 %."
+                  [required]="true"
+                  [error]="fieldError('vat.rate', line)"
+                />
+              } @else {
+                <app-quote-field
+                  [control]="line.controls.vat.controls.note"
+                  [fieldId]="fieldId('vat.note', line)"
+                  label="Motivo del tratamiento de IVA"
+                  [required]="true"
+                  [error]="fieldError('vat.note', line)"
+                />
+              }
+            </div>
+            @if (result.status === 'valid') {
+              <p class="line-total">
+                Total del servicio:
+                <strong>{{ formatMoney(result.totals.lines[index].total) }}</strong>
+              </p>
+            }
+          </fieldset>
+        } @empty {
+          <p class="empty-state">
+            Aún no hay servicios. Añade uno o carga el ejemplo para empezar.
+          </p>
+        }
+        <button
+          id="add-line"
+          type="button"
+          (click)="addLine()"
+          [disabled]="form.controls.lines.length >= store.maxLines"
+        >
+          Añadir servicio
+        </button>
+        @if (form.controls.lines.length >= store.maxLines) {
+          <p class="muted">Has alcanzado el máximo de {{ store.maxLines }} servicios.</p>
+        }
+      </section>
+
+      <fieldset class="panel">
+        <legend>Pago y condiciones</legend>
+        <div class="fields">
+          <app-quote-field
+            [control]="form.controls.payment.controls.holder"
+            fieldId="quote-payment-holder"
+            label="Titular de pago"
+          />
+          <app-quote-field
+            [control]="form.controls.payment.controls.method"
+            fieldId="quote-payment-method"
+            label="Método de pago"
+            [required]="true"
+            [error]="fieldError('payment.method')"
+          />
+          <app-quote-field
+            [control]="form.controls.payment.controls.iban"
+            fieldId="quote-payment-iban"
+            label="IBAN (opcional)"
+          />
+          <app-quote-field
+            class="full-width"
+            [control]="form.controls.payment.controls.instructions"
+            fieldId="quote-payment-instructions"
+            label="Instrucciones de pago"
+            [multiline]="true"
+            [required]="true"
+            [error]="fieldError('payment.instructions')"
+          />
+          <app-quote-field
+            class="full-width"
+            [control]="form.controls.conditions.controls.terms"
+            fieldId="quote-conditions-terms"
+            label="Condiciones"
+            [multiline]="true"
+            [required]="true"
+            [error]="fieldError('conditions.terms')"
+          />
+          <app-quote-field
+            class="full-width"
+            [control]="form.controls.conditions.controls.notes"
+            fieldId="quote-conditions-notes"
+            label="Observaciones"
+            [multiline]="true"
+          />
+        </div>
+        <label class="checkbox-field" for="include-first-month">
+          <input
+            type="checkbox"
+            id="include-first-month"
+            [formControl]="form.controls.conditions.controls.includesFirstMonthlyPayment"
+          />
+          El pago inicial incluye el pago único y la primera mensualidad.
+        </label>
+      </fieldset>
+      <button type="submit" class="primary">Revisar campos</button>
+    </form>
+
+    <aside id="quote-summary" tabindex="-1" aria-labelledby="summary-title">
+      <h2 id="summary-title">Resumen</h2>
+      @if (result.status === 'valid') {
+        <p class="calculation-status" role="status" aria-atomic="true">
+          {{ summaryGroups()[2].title }}: {{ formatMoney(result.totals.combined.total) }}
+        </p>
+        @for (group of summaryGroups(); track $index) {
+          <section class="panel summary-card" [class.combined]="$last" [attr.data-summary]="$index">
+            <h3>{{ group.title }}</h3>
+            <dl>
+              <div>
+                <dt>Antes de descuento</dt>
+                <dd>{{ formatMoney(group.amounts.gross) }}</dd>
+              </div>
+              <div>
+                <dt>Descuento</dt>
+                <dd>{{ formatMoney(group.amounts.discount) }}</dd>
+              </div>
+              <div>
+                <dt>Base sin IVA</dt>
+                <dd>{{ formatMoney(group.amounts.base) }}</dd>
+              </div>
+              <div>
+                <dt>IVA</dt>
+                <dd>{{ formatMoney(group.amounts.vat) }}</dd>
+              </div>
+              <div class="summary-total">
+                <dt>Total</dt>
+                <dd>{{ formatMoney(group.amounts.total) }}</dd>
+              </div>
+            </dl>
+          </section>
+        }
+        <p class="muted">
+          El conjunto suma el pago único y una mensualidad. No representa el coste total de un
+          contrato.
+        </p>
+        @if (store.issues().length > 0 || form.invalid) {
+          <p class="muted">
+            Los importes están calculados. Quedan datos del documento por completar; usa «Revisar
+            campos» para localizarlos.
+          </p>
+        }
+      } @else {
+        <div class="panel calculation-pending">
+          <h3 role="status">
+            {{ result.status === 'incomplete' ? 'Cálculo incompleto' : 'Revisa los importes' }}
+          </h3>
+          <p>
+            Completa o corrige estos datos para obtener el resumen. Un campo vacío no se considera
+            cero.
+          </p>
+          <ul>
+            @for (issue of result.errors.slice(0, 5); track $index) {
+              <li>
+                <strong>{{ issueLabel(issue) }}.</strong>
+                {{ issue.message.replace('con punto', 'con coma o punto decimal') }}
+              </li>
+            }
+          </ul>
+          @if (result.errors.length > 5) {
+            <p>Hay más campos pendientes. Usa «Revisar campos» para ver sus mensajes.</p>
+          }
+        </div>
+      }
+    </aside>
+  </div>
+
+  <dialog
+    #exampleDialog
+    aria-labelledby="example-dialog-title"
+    aria-describedby="example-dialog-description"
+  >
+    <h2 id="example-dialog-title">¿Reemplazar el presupuesto actual?</h2>
+    <p id="example-dialog-description">
+      Cargar el ejemplo sustituirá todos los campos y servicios actuales por datos ficticios. Tus
+      cambios se perderán.
+    </p>
+    <div class="actions">
+      <button type="button" autofocus (click)="cancelExample()">Cancelar</button>
+      <button type="button" class="primary" (click)="confirmExample()">
+        Reemplazar con el ejemplo
+      </button>
+    </div>
+  </dialog>
+  <dialog #conflictDialog aria-labelledby="conflict-title" aria-describedby="conflict-description">
+    <h2 id="conflict-title">¿Descartar los cambios locales?</h2>
+    <p id="conflict-description">
+      Cargar la versión almacenada sustituirá tu borrador. Puedes cancelar y descargarlo como JSON
+      antes de continuar. Si la lectura falla, se conservará el formulario actual.
+    </p>
+    <div class="actions">
+      <button type="button" autofocus (click)="cancelStoredVersion()">Cancelar</button>
+      <button type="button" class="primary" (click)="confirmStoredVersion()">
+        Descartar cambios locales y cargar
+      </button>
+    </div>
+  </dialog>
+}

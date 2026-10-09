@@ -1,0 +1,80 @@
+import type { DraftQuote } from './quote';
+
+/** Datos ficticios. Cada llamada crea una copia nueva para demo y pruebas. */
+export function createReferenceQuote(): DraftQuote {
+  return {
+    id: 'a8066e26-f745-4bba-a214-b9672b9303c1',
+    number: 'DEMO-2026-0001',
+    title: 'Servicios web de demostración',
+    issueDate: '2026-09-17',
+    validUntil: '2026-10-17',
+    status: 'draft',
+    currency: 'EUR',
+    issuer: {
+      name: 'Estudio Nube de Ejemplo',
+      taxId: 'DEMO-EMISOR',
+      address: 'Calle Ficticia 10, Madrid',
+      email: 'estudio@example.com',
+      phone: '',
+    },
+    client: {
+      name: 'Cliente de Demostración',
+      taxId: 'DEMO-CLIENTE',
+      address: 'Avenida de Ejemplo 20, Madrid',
+      email: 'cliente@example.com',
+      phone: '',
+    },
+    brand: { name: 'Estudio Nube de Ejemplo', logoDataUrl: null, accentColor: '#245c48' },
+    payment: {
+      method: 'Transferencia',
+      holder: '',
+      instructions: 'Datos de pago de demostración.',
+      iban: '',
+    },
+    conditions: {
+      terms: 'Propuesta ficticia sin validez comercial.',
+      notes: '',
+      includesFirstMonthlyPayment: false,
+    },
+    schemaVersion: 2,
+    calculationVersion: 1,
+    revision: 0,
+    createdAt: '2026-09-17T10:00:00Z',
+    updatedAt: '2026-09-17T10:00:00Z',
+    lines: [
+      {
+        id: '0a1172d8-89fb-4289-8bc7-b34490b59202',
+        name: 'Mantenimiento web',
+        description: 'Mantenimiento de sitios de demostración.',
+        unit: 'sitio',
+        quantity: '8',
+        unitPrice: '150.00',
+        frequency: 'monthly',
+        discount: { kind: 'none' },
+        vat: { kind: 'taxed', rate: '21' },
+      },
+      {
+        id: '371d684a-7888-487a-b90f-cc20b9a158ca',
+        name: 'Gestión de backups',
+        description: 'Copias de seguridad de demostración.',
+        unit: 'servicio',
+        quantity: '1',
+        unitPrice: '130.00',
+        frequency: 'monthly',
+        discount: { kind: 'none' },
+        vat: { kind: 'taxed', rate: '21' },
+      },
+      {
+        id: '0980ad55-5468-4f12-83c0-967c84362673',
+        name: 'Configuración inicial S3',
+        description: 'Configuración de un entorno de demostración.',
+        unit: 'servicio',
+        quantity: '1',
+        unitPrice: '195.00',
+        frequency: 'one-time',
+        discount: { kind: 'none' },
+        vat: { kind: 'taxed', rate: '21' },
+      },
+    ],
+  };
+}

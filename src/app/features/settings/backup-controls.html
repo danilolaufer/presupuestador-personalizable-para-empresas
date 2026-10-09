@@ -1,0 +1,120 @@
+<section class="panel" aria-labelledby="backup-title">
+  <h2 id="backup-title">Copias de seguridad y recuperación</h2>
+  <p>
+    El PDF sirve para presentar un presupuesto. El JSON permite recuperar presupuestos,
+    configuración, catálogo, logos y numeración en este u otro navegador.
+  </p>
+  <p>
+    Se guardarán primero los cambios pendientes de esta configuración. La copia incluye los datos ya
+    guardados: espera a «Guardado» en otras pestañas antes de exportar.
+  </p>
+  <fieldset [disabled]="busy()">
+    <legend class="visually-hidden">Acciones de copia</legend>
+    <div class="actions">
+      <button type="button" (click)="export()">Exportar copia de seguridad</button>
+      <div>
+        <label for="backup-file">Importar copia de seguridad (JSON, hasta 50 MiB)</label>
+        <input
+          id="backup-file"
+          type="file"
+          accept="application/json,.json"
+          (change)="chooseFile($event)"
+        />
+      </div>
+    </div>
+    @if (review(); as current) {
+      <section class="review" aria-labelledby="import-review-title">
+        <h3 id="import-review-title">Revisar importación</h3>
+        <p>
+          {{ current.backup.quotes.length }} presupuestos ·
+          {{
+            current.backup.settings
+              ? current.backup.settings.catalog.length + ' plantillas de catálogo'
+              : 'Sin configuración'
+          }}
+          · {{ current.backup.counters.length }} contadores de numeración.
+        </p>
+        <p>
+          Los existentes se conservan. «Recuperar como borrador» crea una copia independiente, con
+          ID, número, fechas y líneas nuevos, sin importes cerrados ni enlace de revisión. No
+          reemplaza el documento emitido.
+        </p>
+        <ul class="documents">
+          @for (row of current.rows; track row.quote.id) {
+            <li>
+              <strong
+                >{{ row.quote.number || 'Sin número' }} ·
+                {{ row.quote.title || row.quote.client.name || 'Sin título' }}</strong
+              >
+              <p>{{ labels[row.quote.status] }} · {{ row.quote.lines.length }} servicios</p>
+              @if (reasons().get(row.quote.id); as reason) {
+                <p class="conflict">{{ reason }}</p>
+              }
+              <label [for]="'import-' + row.quote.id"
+                >Decisión para {{ row.quote.number || 'este presupuesto' }}</label
+              >
+              <select
+                [id]="'import-' + row.quote.id"
+                [value]="choices()[row.quote.id]"
+                (change)="select(row.quote.id, $event)"
+              >
+                <option value="skip">Omitir; conservar existentes</option>
+                <option value="restore" [disabled]="reasons().has(row.quote.id)">
+                  Restaurar documento original
+                </option>
+                <option value="copy">Recuperar como borrador independiente</option>
+              </select>
+            </li>
+          }
+        </ul>
+        @if (current.backup.settings; as settings) {
+          <p>
+            Empresa en la copia: {{ settings.issuer.name || 'Sin nombre' }}. Importar la
+            configuración reemplaza los valores de empresa, preferencias y catálogo; los
+            presupuestos conservan sus datos históricos.
+          </p>
+          <label class="checkbox"
+            ><input
+              type="checkbox"
+              [checked]="includeSettings()"
+              (change)="includeSettings.set($any($event.target).checked)"
+            />Importar también la configuración y el catálogo</label
+          >
+        }
+        <p>
+          {{ summary().original }} originales · {{ summary().copy }} borradores independientes ·
+          {{ summary().skipped }} omitidos. Los contadores se combinarán sin reducir su valor.
+        </p>
+        <div class="actions">
+          <button type="button" (click)="cancel()">Cancelar importación</button>
+          <button type="button" (click)="refresh()">Revisar conflictos de nuevo</button>
+          <button type="button" (click)="restore()" [disabled]="blocked()">
+            Confirmar importación
+          </button>
+        </div>
+      </section>
+    }
+    <h3>Demostración</h3>
+    <p>
+      Añade un presupuesto ficticio con los tres servicios de referencia, listo para editar, enviar
+      e imprimir.
+    </p>
+    <button type="button" (click)="createDemo()">Crear presupuesto de demostración</button>
+    @if (demoId()) {
+      <p>
+        <a [routerLink]="['/presupuestos', demoId(), 'editar']"
+          >Abrir presupuesto de demostración</a
+        >
+      </p>
+    }
+  </fieldset>
+  @if (busy()) {
+    <p role="status">Procesando copia…</p>
+  }
+  @if (error()) {
+    <p role="alert" class="error">{{ error() }}</p>
+  }
+  @if (message()) {
+    <p role="status">{{ message() }}</p>
+  }
+</section>
